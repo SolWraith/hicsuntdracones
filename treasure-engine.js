@@ -1,4 +1,4 @@
-/* Dragon's Hoard - motore di generazione del tesoro
+/* Hic Sunt Dracones - motore di generazione del tesoro
  * Conversione della macro MapTool "Esperienza Pathfinder E Tesoro".
  * Logica pura: nessun accesso a DOM o storage, così si può testare da solo.
  */
@@ -345,19 +345,23 @@
 
   // ---- Oggetti magici minori: per ora sempre armi ----
   const MAX_MINORI = 30;
-  const SOLO_ARMI_MINORI = true; // finché true, ogni oggetto magico minore è un'arma (si toglierà quando saranno pronte le altre categorie)
-  const EM = '\u0001'; // delimita i tratti da mostrare in semigrassetto corsivo
+    const EM = '\u0001'; // delimita i tratti da mostrare in semigrassetto corsivo
   const norm = x => String(x).normalize('NFD').replace(/[\u0300-\u036f'’]/g, '').toLowerCase().trim();
   const bonusDi = x => { const m = /\(\+(\d+)\)\s*$/.exec(x); return m ? Number(m[1]) : 0; };
 
-  /** Tira le abilità speciali di un'arma da una tabella, rispettando le regole:
-   *  niente doppioni, "Tira Due Volte" (+2 al conteggio, il tiro conta), bonus totale (base + abilità) al massimo +10. */
+  /** Tira le abilità speciali da una tabella, rispettando le regole:
+   *  niente doppioni, "Tira Due Volte" (+2 al conteggio, il tiro conta), bonus equivalente totale (base + abilità) al massimo +10.
+   *  Le abilità senza "(+n)" (per esempio "(+2700 MO)") hanno bonus equivalente 0: si possono aggiungere anche a +10.
+   *  Restituisce null se la tabella non esiste. */
   function tiraAbilita(tabella, base, quante, rng) {
+    const tab = (root.DH_TABELLE || {})[tabella];
+    if (!tab) return null;
+    const haZero = tab.r.some(x => norm(x[2]) !== 'tira due volte' && bonusDi(x[2]) === 0);
     const scelte = [], viste = new Set();
     let totale = base, daTirare = quante, tentativi = 0;
-    while (daTirare > 0 && totale < 10 && tentativi++ < 2000) {
+    while (daTirare > 0 && tentativi++ < 2000) {
+      if (totale >= 10 && !haZero) break;                     // nessuna abilità può più entrare
       const r = pescaTabella(tabella, rng);
-      if (r === null) break;
       daTirare--;
       const k = norm(r);
       if (k === 'tira due volte') { daTirare += 2; continue; }
@@ -371,6 +375,33 @@
       const a = pescaTabella('Anatema Casuale', rng);
       return a === null ? r : r.replace(/^Anatema/i, a);
     });
+  }
+
+  const BM = '\u0002'; // delimita i tratti da mostrare in semigrassetto (senza corsivo)
+  /** Tratti distintivi di un oggetto magico: 1 tratto fino a 95, 2 da 96 a 99, 3 con 100 (niente doppioni) */
+  function trattiDistintivi(rng) {
+    const NOME = 'Tratti Distintivi Oggetti Magici';
+    if (!(root.DH_TABELLE || {})[NOME]) return '';
+    const p = Math.floor(rng() * 100) + 1, n = p <= 95 ? 1 : p <= 99 ? 2 : 3;
+    const sc = [];
+    for (let g = 0; sc.length < n && g < 200; g++) { const r = pescaTabella(NOME, rng); if (sc.indexOf(r) < 0) sc.push(r); }
+    return 'Tratti distintivi: ' + sc.map(r => { const m = /^(.*?)( \(.*\))$/.exec(r); return m ? BM + m[1] + BM + m[2] : BM + r + BM; }).join('; ');
+  }
+  /** Materiali, qualità speciali, tratti e maledizione (comuni a tutti gli oggetti magici di armi, armature e scudi) */
+  function dettagliMagici(rng, opz) {
+    const d = f => Math.floor(rng() * f) + 1;
+    const metallo = materialeMetallo(d(100));
+    const legno = d(100) >= 96 ? 'Legnoscuro' : 'Comune';
+    const q = [];
+    if (opz.intelligente === 5 ? d(100) <= 5 : d(100) === 1) q.push('Intelligente');
+    if (opz.emanaLuce && d(100) <= 30) q.push('Emana Luce');
+    if (d(100) <= opz.runa) q.push('Disegno, Iscrizione o Runa');
+    const qual = (q.length && !opz.nessuna) ? q.join(', più ') : 'Nessuna';
+    let det = 'Metallo: ' + metallo + '; Legno: ' + legno + '; Qualità speciali: ' + qual;
+    const tr = trattiDistintivi(rng);
+    if (tr) det += '\n' + tr;
+    if (d(100) <= 5) det += '\n' + EM + 'Oggetto maledetto' + EM;
+    return det;
   }
 
   /** Arma magica minore, tutto insieme (macro "Arma Minore Casuale" + tabelle delle abilità).
@@ -411,38 +442,76 @@
       const m = /^(.*?)(\s*\([^)]*\))?$/.exec(risolvi(tipo, rng)); // il bonus va prima di una parentesi finale: "Frecce +2 (20)"
       let testo = EM + m[1] + ' +' + base + EM + (m[2] || '');
       if (quante > 0) {
-        const mis = tiraAbilita('Abilita Arma Minore Mischia', base, quante, rng);
-        const dis = tiraAbilita('Abilita Arma Minore Distanza', base, quante, rng);
+        const mis = tiraAbilita('Abilita Arma Minore Mischia', base, quante, rng) || [];
+        const dis = tiraAbilita('Abilita Arma Minore Distanza', base, quante, rng) || [];
         if (mis.length) testo += '; se arma da mischia: ' + EM + mis.join(', ') + EM;
         if (dis.length) testo += '; se arma a distanza: ' + EM + dis.join(', ') + EM;
       }
       principale = testo;
     }
-    // materiali, qualità speciali e maledizione, come nella macro
-    const metallo = materialeMetallo(d(100));
-    const legno = d(100) >= 96 ? 'Legnoscuro' : 'Comune';
-    const q = [];
-    if (d(100) <= 5) q.push('Intelligente');
-    if (d(100) <= 30) q.push('Emana Luce');
-    if (d(100) <= 10) q.push('Disegno, Iscrizione o Runa');
-    const qual = (q.length && !freccia) ? q.join(', più ') : 'Nessuna';
-    let det = 'Metallo: ' + metallo + '; Legno: ' + legno + '; Qualità speciali: ' + qual;
-    if (d(100) <= 5) det += '\n' + EM + 'Oggetto maledetto' + EM;
-    return principale + '\n' + det;
+    return 'Arma - ' + principale + '\n' + dettagliMagici(rng, { intelligente: 5, emanaLuce: true, runa: 10, nessuna: freccia });
   }
 
+  /** Armatura o scudo magico minore, tutto insieme (macro "Armatura O Scudo Minore Casuale") */
+  function generaArmaturaScudoMinore(rng) {
+    rng = rng || Math.random;
+    const isAS = x => { const m = /^(armatura|scudo)\s*\+(\d+)$/i.exec(String(x).trim()); return m ? { cat: m[1].toLowerCase(), n: Number(m[2]) } : null; };
+    let r = pescaTabella('Armatura O Scudo Minore', rng);
+    if (r === null) return '[tabella “Armatura O Scudo Minore” mancante]';
+    let cat = '', base = 0, quante = 0, specifica = null, guardia = 0;
+    const k0 = norm(r);
+    if (k0 === 'scudo specifico' || k0 === 'armatura specifica') {
+      cat = k0 === 'scudo specifico' ? 'scudo' : 'armatura';
+      specifica = pescaTabella(cat === 'scudo' ? 'Scudo Specifico Minore' : 'Armatura Specifica Minore', rng) || '';
+    } else if (isAS(r)) {
+      cat = isAS(r).cat; base = isAS(r).n;
+    } else { // Abilità speciale e ritira: si ritira finché non esce "Armatura +n" o "Scudo +n" (le versioni specifiche si ignorano)
+      quante = 1;
+      while (guardia++ < 1000) {
+        r = pescaTabella('Armatura O Scudo Minore', rng);
+        if (norm(r) === 'abilita speciale e ritira') { quante++; continue; }
+        const m = isAS(r);
+        if (m) { cat = m.cat; base = m.n; break; }
+      }
+      if (!cat) { cat = 'armatura'; base = 1; }
+    }
+    const prefisso = cat === 'scudo' ? 'Scudo - ' : 'Armatura - ';
+    let principale;
+    if (specifica !== null) {
+      principale = EM + specifica + EM;
+    } else {
+      const tipo = pescaTabella(cat === 'scudo' ? 'Scudo Casuale' : 'Armatura Casuale', rng) || (cat === 'scudo' ? 'Scudo' : 'Armatura');
+      const m = /^(.*?)(\s*\([^)]*\))?$/.exec(risolvi(tipo, rng));
+      let testo = m[1] + ' +' + base + (m[2] || '');
+      if (quante > 0) {
+        const tab = cat === 'scudo' ? 'Abilita Scudo Minore' : 'Abilita Armatura Minore';
+        const ab = tiraAbilita(tab, base, quante, rng);
+        if (ab === null) testo += ', [tabella “' + tab + '” mancante]';
+        else if (ab.length) testo += ', ' + ab.join(', ');
+      }
+      principale = EM + testo + EM;
+    }
+    return prefisso + principale + '\n' + dettagliMagici(rng, { intelligente: 1, emanaLuce: false, runa: 30, nessuna: false });
+  }
+
+  // Categorie di oggetti magici minori già implementate (le altre si ritirano); null = tutte
+  const CATEGORIE_MINORI_IMPLEMENTATE = ['armatura o scudo', 'arma'];
   function generaOggettiMinori(n, rng) {
     rng = rng || Math.random;
     const out = [];
     for (let k = 0; k < Math.min(n, MAX_MINORI); k++) {
-      if (SOLO_ARMI_MINORI) { out.push(generaArmaMinore(rng)); continue; }
-      const c = pescaTabella('Oggetti Magici Minori', rng);
-      out.push(norm(c) === 'arma' ? generaArmaMinore(rng) : '(' + c + ')'); // altre categorie: in arrivo
+      let c = null;
+      for (let g = 0; g < 500; g++) {
+        c = pescaTabella('Oggetti Magici Minori', rng);
+        if (c === null || !CATEGORIE_MINORI_IMPLEMENTATE || CATEGORIE_MINORI_IMPLEMENTATE.indexOf(norm(c)) >= 0) break;
+      }
+      if (c === null) { out.push('[tabella “Oggetti Magici Minori” mancante]'); continue; }
+      out.push(norm(c) === 'arma' ? generaArmaMinore(rng) : norm(c) === 'armatura o scudo' ? generaArmaturaScudoMinore(rng) : '(' + c + ')');
     }
     return out;
   }
 
-  const API = { generaTesoro, generaOggettiMinori, generaArmaMinore, tiraAbilita, MAX_MINORI, EM, generaOggettiComuni, generaArma, generaArmatura, generaScudo, espandiDadi, MAX_COMUNI, generaPersonalizzato, generaGemme, generaOggettiArte, riepilogo, risolvi, MAX_GEMME, MAX_ARTE, interpretaGS, scalaGS, esperienzaPerGS, valoreTesoroPerGS };
+  const API = { generaTesoro, generaOggettiMinori, generaArmaMinore, generaArmaturaScudoMinore, trattiDistintivi, tiraAbilita, MAX_MINORI, EM, BM, generaOggettiComuni, generaArma, generaArmatura, generaScudo, espandiDadi, MAX_COMUNI, generaPersonalizzato, generaGemme, generaOggettiArte, riepilogo, risolvi, MAX_GEMME, MAX_ARTE, interpretaGS, scalaGS, esperienzaPerGS, valoreTesoroPerGS };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
-  else root.DragonsHoard = Object.assign(root.DragonsHoard || {}, API);
+  else root.HicSuntDracones = Object.assign(root.HicSuntDracones || {}, API);
 })(typeof window !== 'undefined' ? window : globalThis);

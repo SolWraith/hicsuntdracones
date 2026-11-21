@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="it"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Dragon’s Hoard</title>
+<title>Hic Sunt Dracones</title>
 <link rel="manifest" href="manifest.json"><link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#000000">
 <style>
@@ -74,10 +74,10 @@ textarea{min-height:90px}
 <script src="data/tabelle.js"></script>
 <script src="treasure-engine.js"></script>
 <script>
-const KEY='dragons-hoard-v1',$=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9),clone=o=>JSON.parse(JSON.stringify(o));
+const KEY='hic-sunt-dracones-v1',$=s=>document.querySelector(s),uid=()=>Math.random().toString(36).slice(2,9),clone=o=>JSON.parse(JSON.stringify(o));
 const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const cl=(v,a,b,d)=>{v=parseInt(v);return isNaN(v)?d:Math.min(b,Math.max(a,v))};
-const DH=window.DragonsHoard;
+const DH=window.HicSuntDracones;
 const fmt=n=>Number(n).toLocaleString('it-IT',{maximumFractionDigits:2,useGrouping:'always'});
 const fl2=n=>Math.floor(n*100+1e-9)/100;
 const DEF={settings:{bg:'#000000',btn:'#004fbf',bd:'#888888',tx:'#e8ecf4',btx:'#e8ecf4',lbl:'#f0f0f0',ini:'#f2b33d',fs:16,ts:18},treasures:{}};
@@ -164,12 +164,13 @@ function arteHTML(t){const N=t.arteList,A=t.arteAlt,all=N.concat(A);if(!all.leng
   <div class="it"><b>Dimensioni:</b> ${esc(x.dim)}</div><div class="mu" style="font-size:.92em">R = Materiale Robusto / F = Materiale Fragile</div></div>`).join('')
  +(all.length>1?totRow(all):'')+limNote(t.arte,all.length)}
 // nome in semigrassetto; prefisso ("Arma - "), taglia e dadi tra parentesi in peso normale
-const EMC=DH.EM;
+const EMC=DH.EM,BMC=DH.BM;
 const nomeEx=h=>{const m=/^((?:Arma|Armatura|Scudo) - )?(.*?)( \((?:per creature di taglia|\d+d\d)[^)]*\))?$/.exec(h);return`${esc(m[1]||'')}<span class="nm2">${esc(m[2])}</span>${esc(m[3]||'')}`};
 // testo con tratti in semigrassetto corsivo (delimitati da un carattere di controllo)
 const richHTML=x=>String(x).split(EMC).map((p,i)=>i%2?`<span class="nm2"><i>${esc(p)}</i></span>`:esc(p)).join('');
 // righe di dettaglio "Etichetta: valore; Etichetta: valore": i valori in semigrassetto
 function detHTML(l){if(l.indexOf(EMC)>=0)return richHTML(l);
+ if(l.indexOf(BMC)>=0)return l.split(BMC).map((p,i)=>i%2?`<span class="nm2">${esc(p)}</span>`:esc(p)).join('');
  const re=/(^|; )([^:;]+): ((?:[^;(]|\([^)]*\))+)/g;let o='',i=0,m;
  while((m=re.exec(l))){const v=/^([^(]*?)(\s*\(.*)$/.exec(m[3])||[0,m[3],''];
   o+=esc(l.slice(i,m.index)+m[1]+m[2]+': ')+`<span class="nm2">${esc(v[1])}</span>${esc(v[2])}`;i=m.index+m[0].length}
@@ -200,9 +201,9 @@ function testoTesoro(t){const L=[],aT=fl2(t.val/t.part);
    if(x.alt){L.push(`   Tipo: ${x.tipo}; Specifico: ${x.spec}`);x.opz.forEach((p,k)=>L.push(`   Opzione ${ROM3[k]}: materiale robusto: ${p.rob}; materiale fragile: ${p.fra}; scena dipinta: ${p.scena}; abbellimento: ${p.abb}`));L.push(`   Dimensioni: ${x.dim}`,'   (R = Materiale Robusto / F = Materiale Fragile)')}});
   tot(all);lim(t.arte,all.length)}
  L.push('','Oggetti comuni:');const C=t.comuniList;
- if(!C.length)L.push('Nessun oggetto comune.');else{C.forEach((x,i)=>{const r=String(x).replace(/\u0001/g,'').split('\n');L.push(`${numL(i+1,C.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.comuni,C.length)}
+ if(!C.length)L.push('Nessun oggetto comune.');else{C.forEach((x,i)=>{const r=String(x).replace(/[\u0001\u0002]/g,'').split('\n');L.push(`${numL(i+1,C.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.comuni,C.length)}
  L.push('','Oggetti magici:');const Mi=t.minoriList,mg=MAGICI.filter(([k])=>t.oggetti[k]>0);
- if(t.oggetti.minori>0){L.push('Minori:');Mi.forEach((x,i)=>{const r=String(x).replace(/\u0001/g,'').split('\n');L.push(`${numL(i+1,Mi.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.minori,Mi.length)}
+ if(t.oggetti.minori>0){L.push('Minori:');Mi.forEach((x,i)=>{const r=String(x).replace(/[\u0001\u0002]/g,'').split('\n');L.push(`${numL(i+1,Mi.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.minori,Mi.length)}
  mg.forEach(([k,l])=>L.push(`${l}: ${t.oggetti[k]}`));
  if(t.oggetti.minori<=0&&!mg.length)L.push('Nessun oggetto magico.');
  if(t.notes.trim())L.push('','Note:',t.notes.trim());
@@ -210,7 +211,7 @@ function testoTesoro(t){const L=[],aT=fl2(t.val/t.part);
 const nrow=(l,k,v)=>`<label class="fr"><span>${l}</span><input type="number" inputmode="numeric" min="0" data-sel data-t="${k}" value="${v}"></label>`;
 
 function render(){
- const y=scrollY;let v=V.v,t='Dragon’s Hoard',h='';
+ const y=scrollY;let v=V.v,t='Hic Sunt Dracones',h='';
  if(v==='treasure'&&!S.treasures[V.id]){V={v:'home'};v='home'}
  if(v==='treasure'&&syncLists(S.treasures[V.id]))save();
  if(v==='home'){
@@ -280,8 +281,8 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b
  case'delcur':{const x=S.treasures[V.id];return ask(`Eliminare “${x.name}”?`,()=>{delete S.treasures[V.id];save();history.back()})}
  case'theme':{const x=THEMES.find(z=>z.id===id);Object.assign(S.settings,x.c);applyStyle();return commit()}
  case'sreset':return ask('Ripristinare tutti i colori e le dimensioni del testo ai valori predefiniti?',()=>{S.settings=clone(DEF.settings);applyStyle();commit()},'Ripristina');
- case'ex':return NAT()?nativeShare(dump(),'DragonsHoard-backup.json'):download(dump(),'DragonsHoard-backup.json');
- case'sh':return share(dump(),'DragonsHoard-backup.json');
+ case'ex':return NAT()?nativeShare(dump(),'HicSuntDracones-backup.json'):download(dump(),'HicSuntDracones-backup.json');
+ case'sh':return share(dump(),'HicSuntDracones-backup.json');
  case'impf':fileMode='backup';return $('#file').click();
  case'impt1f':fileMode='tesoro';return $('#file').click();
  case'impt1t':return impTesoro($('#tx').value);
@@ -322,7 +323,7 @@ document.addEventListener('mouseup',e=>{const t=e.target;if(selNext&&t===selNext
 
 // ---- backup ----
 const NAT=()=>!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform());
-const dump=()=>JSON.stringify({app:'dragons-hoard',v:1,data:S},null,1);
+const dump=()=>JSON.stringify({app:'hic-sunt-dracones',v:1,data:S},null,1);
 function download(txt,fn){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([txt],{type:'application/json'}));a.download=fn;document.body.appendChild(a);a.click();a.remove();toast('File salvato')}
 async function nativeShare(txt,fn){try{const P=Capacitor.Plugins,r=await P.Filesystem.writeFile({path:fn,data:txt,directory:'CACHE',encoding:'utf8'});await P.Share.share({title:fn,url:r.uri,dialogTitle:fn})}catch(e){if(!/cancel/i.test(String(e&&e.message||e)))toast('Condivisione non disponibile: usa Copia testo')}}
 async function share(txt,fn){if(NAT())return nativeShare(txt,fn);
@@ -331,12 +332,12 @@ function copyText(txt,msg){const ok=()=>toast(msg||'Copiato');
  if(NAT()&&Capacitor.Plugins.Clipboard)return Capacitor.Plugins.Clipboard.write({string:txt}).then(ok,()=>toast('Copia non riuscita'));
  return navigator.clipboard.writeText(txt).then(ok,()=>{const a=document.createElement('textarea');a.value=txt;document.body.appendChild(a);a.select();try{document.execCommand('copy');ok()}catch(e){toast('Copia non riuscita')}a.remove()})}
 // esportazione del singolo tesoro (codice reimportabile)
-const dumpT=t=>JSON.stringify({app:'dragons-hoard',tipo:'tesoro',v:1,data:t});
+const dumpT=t=>JSON.stringify({app:'hic-sunt-dracones',tipo:'tesoro',v:1,data:t});
 const fnT=t=>'Tesoro-'+t.name.replace(/[^\w\-]+/g,'_').replace(/^_+|_+$/g,'')+'.json';
 function askExport(){const m=$('#modal');
  m.innerHTML=`<div class="mb"><p><b>Esporta codice del tesoro</b></p><p class="mu">Il codice permette di reimportare questo tesoro nell’app (anche su un altro dispositivo) con “Importa tesoro”.</p><div class="btns"><button data-a="tsave">Salva file</button><button data-a="tshare">Condividi</button><button data-a="tcode">Copia codice</button></div><div class="btns"><button data-a="mclose">Chiudi</button></div></div>`;m.hidden=false}
 function impTesoro(txt){let d;try{d=JSON.parse(txt)}catch(e){}
- if(!d||d.app!=='dragons-hoard'||d.tipo!=='tesoro'||!d.data)return toast('Codice del tesoro non valido');
+ if(!d||['hic-sunt-dracones','dragons-hoard'].indexOf(d.app)<0||d.tipo!=='tesoro'||!d.data)return toast('Codice del tesoro non valido');
  const t=fixT(d.data);if(!t)return toast('Codice del tesoro non valido');
  const others=Object.values(S.treasures);t.name=t.auto?autoName(t.gs,others):uniq(t.name,S.treasures);
  S.treasures[t.id]=t;save();V={v:'treasure',id:t.id};OPEN=new Set();TS={};history.replaceState({},'');scrollTo(0,0);render();toast('Tesoro importato')}
