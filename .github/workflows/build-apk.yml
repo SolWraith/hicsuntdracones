@@ -55,11 +55,11 @@ jobs:
           echo "$KEYSTORE_BASE64" | base64 -d > ks.keystore
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           $BT/zipalign -p -f 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-          $BT/apksigner sign --ks ks.keystore --ks-pass env:KS_PASS --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS --out DragonsHoard.apk aligned.apk
-          $BT/apksigner verify DragonsHoard.apk
+          $BT/apksigner sign --ks ks.keystore --ks-pass env:KS_PASS --ks-key-alias "$KEY_ALIAS" --key-pass env:KEY_PASS --out HicSuntDracones.apk aligned.apk
+          $BT/apksigner verify HicSuntDracones.apk
           rm ks.keystore
       - uses: softprops/action-gh-release@v3
         with:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
-          files: DragonsHoard.apk
+          files: HicSuntDracones.apk
