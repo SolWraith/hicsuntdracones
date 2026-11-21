@@ -100,7 +100,7 @@ function fixT(t){if(!t||typeof t!=='object')return null;const g=DH.interpretaGS(
  return{id:uid(),name:String(t.name||'Tesoro').slice(0,80),auto:!!t.auto,created:isNaN(Date.parse(t.created))?new Date().toISOString():t.created,gs:g.etichetta,
  part:Math.max(1,n0(t.part)),molt:Math.max(1,n0(t.molt)),xp:n0(t.xp),val:n0(t.val),
  monete:{mr:n0(m.mr),ma:n0(m.ma),mo:n0(m.mo),mp:n0(m.mp)},gemme:n0(t.gemme),arte:n0(t.arte),
- oggetti:{comuni:n0(o.comuni),minori:n0(o.minori),medi:n0(o.medi),maggiori:n0(o.maggiori)},gemmeList:fixL(t.gemmeList,DH.MAX_GEMME),arteList:fixL(t.arteList,DH.MAX_ARTE),arteAlt:fixAlt(t.arteAlt,DH.MAX_ARTE-fixL(t.arteList,DH.MAX_ARTE).length),comuniList:Array.isArray(t.comuniList)?t.comuniList.slice(0,DH.MAX_COMUNI).map(x=>String(x||'').slice(0,700)):[],notes:String(t.notes||'').slice(0,5000)}}
+ oggetti:{comuni:n0(o.comuni),minori:n0(o.minori),medi:n0(o.medi),maggiori:n0(o.maggiori)},gemmeList:fixL(t.gemmeList,DH.MAX_GEMME),arteList:fixL(t.arteList,DH.MAX_ARTE),arteAlt:fixAlt(t.arteAlt,DH.MAX_ARTE-fixL(t.arteList,DH.MAX_ARTE).length),comuniList:Array.isArray(t.comuniList)?t.comuniList.slice(0,DH.MAX_COMUNI).map(x=>String(x||'').slice(0,700)):[],minoriList:Array.isArray(t.minoriList)?t.minoriList.slice(0,DH.MAX_MINORI).map(x=>String(x||'').slice(0,1500)):[],notes:String(t.notes||'').slice(0,5000)}}
 const norm=d=>{const s={...DEF.settings,...(d&&d.settings)};
  for(const k of['bg','btn','bd','tx','btx','lbl','ini'])if(!/^#[0-9a-f]{6}$/i.test(s[k]))s[k]=DEF.settings[k];
  s.fs=cl(s.fs,10,40,16);s.ts=cl(s.ts,10,40,18);const tr={};
@@ -145,6 +145,8 @@ function syncLists(t){let ch=false;
  else if(tot<wa){t.arteList=t.arteList.concat(DH.generaOggettiArte(wa-tot));ch=true}
  const c=t.comuniList,wc=Math.min(t.oggetti.comuni,DH.MAX_COMUNI);
  if(c.length>wc){t.comuniList=c.slice(0,wc);ch=true}else if(c.length<wc){t.comuniList=c.concat(DH.generaOggettiComuni(wc-c.length));ch=true}
+ const mi=t.minoriList,wm=Math.min(t.oggetti.minori,DH.MAX_MINORI);
+ if(mi.length>wm){t.minoriList=mi.slice(0,wm);ch=true}else if(mi.length<wm){t.minoriList=mi.concat(DH.generaOggettiMinori(wm-mi.length));ch=true}
  return ch}
 const BULB='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>';
 const ROM3=['I','II','III'];
@@ -161,13 +163,25 @@ function arteHTML(t){const N=t.arteList,A=t.arteAlt,all=N.concat(A);if(!all.leng
   ${x.opz.map((p,k)=>`<div class="opt"><b>Opzione ${ROM3[k]}</b><div>Materiale robusto: ${esc(p.rob)}</div><div>Materiale fragile: ${esc(p.fra)}</div><div>Scena dipinta: ${esc(p.scena)}</div><div>Abbellimento: ${esc(p.abb)}</div></div>`).join('')}
   <div class="it"><b>Dimensioni:</b> ${esc(x.dim)}</div><div class="mu" style="font-size:.92em">R = Materiale Robusto / F = Materiale Fragile</div></div>`).join('')
  +(all.length>1?totRow(all):'')+limNote(t.arte,all.length)}
-// nome in semigrassetto; la parte finale tra parentesi (taglia, dadi) e le righe di dettaglio in peso normale
-const nomeEx=h=>{const m=/^(.*?)( \((?:per creature di taglia|\d+d\d)[^)]*\))$/.exec(h);return m?`<span class="nm2">${esc(m[1])}</span>${esc(m[2])}`:`<span class="nm2">${esc(h)}</span>`};
+// nome in semigrassetto; prefisso ("Arma - "), taglia e dadi tra parentesi in peso normale
+const EMC=DH.EM;
+const nomeEx=h=>{const m=/^((?:Arma|Armatura|Scudo) - )?(.*?)( \((?:per creature di taglia|\d+d\d)[^)]*\))?$/.exec(h);return`${esc(m[1]||'')}<span class="nm2">${esc(m[2])}</span>${esc(m[3]||'')}`};
+// testo con tratti in semigrassetto corsivo (delimitati da un carattere di controllo)
+const richHTML=x=>String(x).split(EMC).map((p,i)=>i%2?`<span class="nm2"><i>${esc(p)}</i></span>`:esc(p)).join('');
+// righe di dettaglio "Etichetta: valore; Etichetta: valore": i valori in semigrassetto
+function detHTML(l){if(l.indexOf(EMC)>=0)return richHTML(l);
+ const re=/(^|; )([^:;]+): ((?:[^;(]|\([^)]*\))+)/g;let o='',i=0,m;
+ while((m=re.exec(l))){const v=/^([^(]*?)(\s*\(.*)$/.exec(m[3])||[0,m[3],''];
+  o+=esc(l.slice(i,m.index)+m[1]+m[2]+': ')+`<span class="nm2">${esc(v[1])}</span>${esc(v[2])}`;i=m.index+m[0].length}
+ return o+esc(l.slice(i))}
+function itemHTML(x){const r=String(x).split('\n'),h=r.shift();return(h.indexOf(EMC)>=0?richHTML(h):nomeEx(h))+r.map(l=>`<div class="sub">${detHTML(l)}</div>`).join('')}
 function comuniHTML(t){const L=t.comuniList;if(!L.length)return'<span class="mu">Nessun oggetto comune.</span>';
- return L.map((x,i)=>{const r=String(x).split('\n'),h=r.shift();return`<div class="it">${numL(i+1,L.length)}${nomeEx(h)}${r.map(l=>`<div class="sub">${esc(l)}</div>`).join('')}</div>`}).join('')+limNote(t.oggetti.comuni,L.length)}
-const MAGICI=[['minori','Minori'],['medi','Medi'],['maggiori','Maggiori']];
-function magiciHTML(t){const r=MAGICI.filter(([k])=>t.oggetti[k]>0);
- return r.length?r.map(([k,l])=>`<div class="it">${l}: <b>${t.oggetti[k]}</b></div>`).join(''):'<span class="mu">Nessun oggetto magico.</span>'}
+ return L.map((x,i)=>`<div class="it">${numL(i+1,L.length)}${itemHTML(x)}</div>`).join('')+limNote(t.oggetti.comuni,L.length)}
+const MAGICI=[['medi','Medi'],['maggiori','Maggiori']];
+function magiciHTML(t){const L=t.minoriList,o=t.oggetti;let h='';
+ if(o.minori>0)h+='<div class="it"><b>Minori:</b></div>'+L.map((x,i)=>`<div class="it">${numL(i+1,L.length)}${itemHTML(x)}</div>`).join('')+limNote(o.minori,L.length);
+ h+=MAGICI.filter(([k])=>o[k]>0).map(([k,l])=>`<div class="it">${l}: <b>${o[k]}</b></div>`).join('');
+ return h||'<span class="mu">Nessun oggetto magico.</span>'}
 function paintLists(){const t=S.treasures[V.id];if(!t)return;setH('#dG',gemmeHTML(t));setH('#dA',arteHTML(t));setH('#dC',comuniHTML(t));setH('#dMg',magiciHTML(t))}
 // testo leggibile del tesoro (per "Copia testo")
 function testoTesoro(t){const L=[],aT=fl2(t.val/t.part);
@@ -186,9 +200,11 @@ function testoTesoro(t){const L=[],aT=fl2(t.val/t.part);
    if(x.alt){L.push(`   Tipo: ${x.tipo}; Specifico: ${x.spec}`);x.opz.forEach((p,k)=>L.push(`   Opzione ${ROM3[k]}: materiale robusto: ${p.rob}; materiale fragile: ${p.fra}; scena dipinta: ${p.scena}; abbellimento: ${p.abb}`));L.push(`   Dimensioni: ${x.dim}`,'   (R = Materiale Robusto / F = Materiale Fragile)')}});
   tot(all);lim(t.arte,all.length)}
  L.push('','Oggetti comuni:');const C=t.comuniList;
- if(!C.length)L.push('Nessun oggetto comune.');else{C.forEach((x,i)=>{const r=String(x).split('\n');L.push(`${numL(i+1,C.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.comuni,C.length)}
- L.push('','Oggetti magici:');const M=MAGICI.filter(([k])=>t.oggetti[k]>0);
- if(M.length)M.forEach(([k,l])=>L.push(`${l}: ${t.oggetti[k]}`));else L.push('Nessun oggetto magico.');
+ if(!C.length)L.push('Nessun oggetto comune.');else{C.forEach((x,i)=>{const r=String(x).replace(/\u0001/g,'').split('\n');L.push(`${numL(i+1,C.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.comuni,C.length)}
+ L.push('','Oggetti magici:');const Mi=t.minoriList,mg=MAGICI.filter(([k])=>t.oggetti[k]>0);
+ if(t.oggetti.minori>0){L.push('Minori:');Mi.forEach((x,i)=>{const r=String(x).replace(/\u0001/g,'').split('\n');L.push(`${numL(i+1,Mi.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.minori,Mi.length)}
+ mg.forEach(([k,l])=>L.push(`${l}: ${t.oggetti[k]}`));
+ if(t.oggetti.minori<=0&&!mg.length)L.push('Nessun oggetto magico.');
  if(t.notes.trim())L.push('','Note:',t.notes.trim());
  return L.join('\n')}
 const nrow=(l,k,v)=>`<label class="fr"><span>${l}</span><input type="number" inputmode="numeric" min="0" data-sel data-t="${k}" value="${v}"></label>`;
@@ -219,7 +235,7 @@ function render(){
    <div class="hint">Il tesoro viene modificato immediatamente quando si altera un valore.</div>
    ${nrow('Partecipanti','part',x.part)}${MONETE.map(([k,l])=>nrow(l,'m:'+k,x.monete[k])).join('')}
    ${nrow(`Gemme (max ${DH.MAX_GEMME})`,'gemme',x.gemme)}${nrow(`Oggetti d’arte (max ${DH.MAX_ARTE})`,'arte',x.arte)}
-   ${OGG.map(([k,l])=>nrow(k==='comuni'?`${l} (max ${DH.MAX_COMUNI})`:l,'o:'+k,x.oggetti[k])).join('')}
+   ${OGG.map(([k,l])=>nrow(k==='comuni'?`${l} (max ${DH.MAX_COMUNI})`:k==='minori'?`${l} (max ${DH.MAX_MINORI})`:l,'o:'+k,x.oggetti[k])).join('')}
    <label class="fr col"><span>Note</span><textarea data-t="notes" placeholder="Annotazioni sul tesoro">${esc(x.notes)}</textarea></label></div></details>
   ${box('s-m','Monete','dM')}${box('s-g','Gemme','dG')}${box('s-a','Oggetti d’Arte','dA')}${box('s-c','Oggetti comuni','dC')}${box('s-mg','Oggetti magici','dMg')}
   <div class="btns" style="margin-top:10px"><button class="dng" data-a="delcur">Elimina questo tesoro</button></div></div>`}
@@ -247,7 +263,7 @@ function make(){
  const g=DH.interpretaGS($('#f-gs').value),part=cl($('#f-part').value,1,9999,4),molt=cl($('#f-molt').value,1,9999,1);
  const r=DH.generaTesoro({gs:g.etichetta,partecipanti:part,moltiplicatore:molt});
  const t={id:uid(),name:autoName(g.etichetta,Object.values(S.treasures)),auto:true,created:new Date().toISOString(),gs:g.etichetta,part,molt,xp:r.esperienza,val:r.valoreTesoro,
-  monete:r.monete,gemme:r.beni.gemme,arte:r.beni.oggettiArte,oggetti:r.oggetti,gemmeList:r.beni.listaGemme,arteList:r.beni.listaArte,arteAlt:[],comuniList:r.listaComuni,notes:''};
+  monete:r.monete,gemme:r.beni.gemme,arte:r.beni.oggettiArte,oggetti:r.oggetti,gemmeList:r.beni.listaGemme,arteList:r.beni.listaArte,arteAlt:[],comuniList:r.listaComuni,minoriList:r.listaMinori,notes:''};
  S.treasures[t.id]=t;save();V={v:'treasure',id:t.id};OPEN=new Set();TS={};history.replaceState({},'');scrollTo(0,0);render()}
 
 // ---- click ----

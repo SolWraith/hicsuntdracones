@@ -150,6 +150,7 @@
       beni: { gemme: gemme, oggettiArte: oggArte, listaGemme: generaGemme(gemme, rng), listaArte: generaOggettiArte(oggArte, rng) },
       oggetti: { comuni: comuni, minori: minori, medi: medi, maggiori: maggiori },
       listaComuni: generaOggettiComuni(comuni, rng),
+      listaMinori: generaOggettiMinori(minori, rng),
       categoriaOggetti: categoria
     };
   }
@@ -300,11 +301,11 @@
     const perfetta = d(100) >= 76;
     const t = d(138);
     const taglia = t >= 138 ? 'Colossale' : t >= 136 ? 'Mastodontica' : t >= 131 ? 'Enorme' : t >= 121 ? 'Grande' : t >= 101 ? 'Piccola' : 'Media';
-    let det = 'Perfetta (se non magica): ' + (perfetta ? 'Sì' : 'No') + '; Metallo: ' + metallo + '; Legno: ' + legno;
+    let det = 'Perfetta: ' + (perfetta ? 'Sì' : 'No') + '; Metallo: ' + metallo + '; Legno: ' + legno;
     if (costoBonus && potente > 0) det += '; Potente: +' + potente + ' (+' + costoBonus + ' MO x bonus; totale: +' + (potente * costoBonus) + ' MO)';
-    return risolvi(nome, rng) + ' (per creature di taglia ' + taglia + ')\n' + det;
+    return 'Arma - ' + risolvi(nome, rng) + ' (per creature di taglia ' + taglia + ')\n' + det;
   }
-  function armaturaOScudo(tabella, perfettaLabel, rng) {
+  function armaturaOScudo(tabella, prefisso, perfettaLabel, rng) {
     rng = rng || Math.random;
     const d = f => Math.floor(rng() * f) + 1;
     const nome = pescaTabella(tabella, rng);
@@ -315,11 +316,11 @@
     const perfetta = d(100) >= 76;
     const t = d(100);
     const taglia = t >= 99 ? 'Enorme' : t >= 91 ? 'Grande' : t >= 76 ? 'Piccola' : 'Media';
-    return risolvi(nome, rng) + ' (per creature di taglia ' + taglia + ')\n' + perfettaLabel + ' (se variabile): ' + (perfetta ? 'Sì' : 'No') +
+    return prefisso + ' - ' + risolvi(nome, rng) + ' (per creature di taglia ' + taglia + ')\n' + perfettaLabel + ': ' + (perfetta ? 'Sì' : 'No') +
       '; Metallo: ' + metallo + '; Legno: ' + legno + '; Chiodatura: ' + (chiodato ? 'Chiodato' : 'No');
   }
-  const generaArmatura = rng => armaturaOScudo('Armatura Casuale', 'Perfetta', rng);
-  const generaScudo = rng => armaturaOScudo('Scudo Casuale', 'Perfetto', rng);
+  const generaArmatura = rng => armaturaOScudo('Armatura Casuale', 'Armatura', 'Perfetta', rng);
+  const generaScudo = rng => armaturaOScudo('Scudo Casuale', 'Scudo', 'Perfetto', rng);
 
   /** Oggetti comuni (macro "Oggetti Comuni"): ogni elemento è una stringa (le righe successive alla prima sono dettagli) */
   function generaOggettiComuni(n, rng) {
@@ -342,7 +343,106 @@
     return out;
   }
 
-  const API = { generaTesoro, generaOggettiComuni, generaArma, generaArmatura, generaScudo, espandiDadi, MAX_COMUNI, generaPersonalizzato, generaGemme, generaOggettiArte, riepilogo, risolvi, MAX_GEMME, MAX_ARTE, interpretaGS, scalaGS, esperienzaPerGS, valoreTesoroPerGS };
+  // ---- Oggetti magici minori: per ora sempre armi ----
+  const MAX_MINORI = 30;
+  const SOLO_ARMI_MINORI = true; // finché true, ogni oggetto magico minore è un'arma (si toglierà quando saranno pronte le altre categorie)
+  const EM = '\u0001'; // delimita i tratti da mostrare in semigrassetto corsivo
+  const norm = x => String(x).normalize('NFD').replace(/[\u0300-\u036f'’]/g, '').toLowerCase().trim();
+  const bonusDi = x => { const m = /\(\+(\d+)\)\s*$/.exec(x); return m ? Number(m[1]) : 0; };
+
+  /** Tira le abilità speciali di un'arma da una tabella, rispettando le regole:
+   *  niente doppioni, "Tira Due Volte" (+2 al conteggio, il tiro conta), bonus totale (base + abilità) al massimo +10. */
+  function tiraAbilita(tabella, base, quante, rng) {
+    const scelte = [], viste = new Set();
+    let totale = base, daTirare = quante, tentativi = 0;
+    while (daTirare > 0 && totale < 10 && tentativi++ < 2000) {
+      const r = pescaTabella(tabella, rng);
+      if (r === null) break;
+      daTirare--;
+      const k = norm(r);
+      if (k === 'tira due volte') { daTirare += 2; continue; }
+      if (viste.has(k)) { daTirare++; continue; }           // doppione: ignorato e non conteggiato
+      const b = bonusDi(r);
+      if (totale + b > 10) { daTirare++; continue; }          // supererebbe +10: scartata
+      viste.add(k); totale += b; scelte.push(r);
+    }
+    return scelte.map(r => {
+      if (!/^anatema\b/i.test(r)) return r;
+      const a = pescaTabella('Anatema Casuale', rng);
+      return a === null ? r : r.replace(/^Anatema/i, a);
+    });
+  }
+
+  /** Arma magica minore, tutto insieme (macro "Arma Minore Casuale" + tabelle delle abilità).
+   *  Testo su più righe: la prima è il risultato (con tratti in EM...EM), le altre i dettagli. */
+  function generaArmaMinore(rng) {
+    rng = rng || Math.random;
+    const d = f => Math.floor(rng() * f) + 1;
+    const isArma = x => /^arma\s*\+(\d+)$/i.exec(String(x).trim());
+    let r = pescaTabella('Arma Minore', rng);
+    if (r === null) return '[tabella “Arma Minore” mancante]';
+    let base = 0, quante = 0, specifica = null, guardia = 0;
+    if (norm(r) === 'arma specifica') {
+      let sp = pescaTabella('Arma Specifica Minore', rng) || '';
+      if (/^freccia assassina/i.test(sp)) { // la macro originale non arrivava mai a questa tabella: qui sì
+        const f = pescaTabella('Freccia Assassina', rng);
+        const prezzo = /\(([^)]*MO)\)\s*$/.exec(sp);
+        if (f !== null) sp = f + (prezzo ? ' (' + prezzo[1] + ')' : '');
+      }
+      specifica = sp;
+    } else if (isArma(r)) {
+      base = Number(isArma(r)[1]);
+    } else { // Abilità speciale e ritira: si ritira finché non esce "Arma +n" (le armi specifiche si ignorano)
+      quante = 1;
+      while (guardia++ < 1000) {
+        r = pescaTabella('Arma Minore', rng);
+        if (norm(r) === 'abilita speciale e ritira') { quante++; continue; }
+        const m = isArma(r);
+        if (m) { base = Number(m[1]); break; }
+      }
+      if (!base) base = 1;
+    }
+    let principale, freccia = false;
+    if (specifica !== null) {
+      freccia = /^freccia assassina/i.test(specifica);
+      principale = EM + specifica + EM;
+    } else {
+      const tipo = pescaTabella('Arma Casuale', rng) || 'Arma';
+      const m = /^(.*?)(\s*\([^)]*\))?$/.exec(risolvi(tipo, rng)); // il bonus va prima di una parentesi finale: "Frecce +2 (20)"
+      let testo = EM + m[1] + ' +' + base + EM + (m[2] || '');
+      if (quante > 0) {
+        const mis = tiraAbilita('Abilita Arma Minore Mischia', base, quante, rng);
+        const dis = tiraAbilita('Abilita Arma Minore Distanza', base, quante, rng);
+        if (mis.length) testo += '; se arma da mischia: ' + EM + mis.join(', ') + EM;
+        if (dis.length) testo += '; se arma a distanza: ' + EM + dis.join(', ') + EM;
+      }
+      principale = testo;
+    }
+    // materiali, qualità speciali e maledizione, come nella macro
+    const metallo = materialeMetallo(d(100));
+    const legno = d(100) >= 96 ? 'Legnoscuro' : 'Comune';
+    const q = [];
+    if (d(100) <= 5) q.push('Intelligente');
+    if (d(100) <= 30) q.push('Emana Luce');
+    if (d(100) <= 10) q.push('Disegno, Iscrizione o Runa');
+    const qual = (q.length && !freccia) ? q.join(', più ') : 'Nessuna';
+    let det = 'Metallo: ' + metallo + '; Legno: ' + legno + '; Qualità speciali: ' + qual;
+    if (d(100) <= 5) det += '\n' + EM + 'Oggetto maledetto' + EM;
+    return principale + '\n' + det;
+  }
+
+  function generaOggettiMinori(n, rng) {
+    rng = rng || Math.random;
+    const out = [];
+    for (let k = 0; k < Math.min(n, MAX_MINORI); k++) {
+      if (SOLO_ARMI_MINORI) { out.push(generaArmaMinore(rng)); continue; }
+      const c = pescaTabella('Oggetti Magici Minori', rng);
+      out.push(norm(c) === 'arma' ? generaArmaMinore(rng) : '(' + c + ')'); // altre categorie: in arrivo
+    }
+    return out;
+  }
+
+  const API = { generaTesoro, generaOggettiMinori, generaArmaMinore, tiraAbilita, MAX_MINORI, EM, generaOggettiComuni, generaArma, generaArmatura, generaScudo, espandiDadi, MAX_COMUNI, generaPersonalizzato, generaGemme, generaOggettiArte, riepilogo, risolvi, MAX_GEMME, MAX_ARTE, interpretaGS, scalaGS, esperienzaPerGS, valoreTesoroPerGS };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.DragonsHoard = Object.assign(root.DragonsHoard || {}, API);
 })(typeof window !== 'undefined' ? window : globalThis);
