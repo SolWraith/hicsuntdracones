@@ -387,6 +387,12 @@
     for (let g = 0; sc.length < n && g < 200; g++) { const r = pescaTabella(NOME, rng); if (sc.indexOf(r) < 0) sc.push(r); }
     return 'Tratti distintivi: ' + sc.map(r => { const m = /^(.*?)( \(.*\))$/.exec(r); return m ? BM + m[1] + BM + m[2] : BM + r + BM; }).join('; ');
   }
+  /** Maledizione comune: 1d100 <= 5 (per ogni oggetto magico che non sia un oggetto maledetto specifico) */
+  function rigaMaledizione(rng) {
+    if (Math.floor(rng() * 100) + 1 > 5) return '';
+    const m = pescaTabella('Maledizioni Comuni', rng);
+    return 'Maledizione comune: ' + (m === null ? '[tabella “Maledizioni Comuni” mancante]' : risolvi(m, rng));
+  }
   /** Materiali, qualità speciali, tratti e maledizione (comuni a tutti gli oggetti magici di armi, armature e scudi) */
   function dettagliMagici(rng, opz) {
     const d = f => Math.floor(rng() * f) + 1;
@@ -400,7 +406,8 @@
     let det = 'Metallo: ' + metallo + '; Legno: ' + legno + '; Qualità speciali: ' + qual;
     const tr = trattiDistintivi(rng);
     if (tr) det += '\n' + tr;
-    if (d(100) <= 5) det += '\n' + EM + 'Oggetto maledetto' + EM;
+    const ml = rigaMaledizione(rng);
+    if (ml) det += '\n' + ml;
     return det;
   }
 
@@ -498,17 +505,26 @@
   function oggettoDaTabella(prefisso, tabella, rng) {
     const r = pescaTabella(tabella, rng);
     if (r === null) return '[tabella “' + tabella + '” mancante]';
+    const t = trattiDistintivi(rng), ml = rigaMaledizione(rng);
+    return prefisso + ' - ' + EM + risolvi(r, rng) + EM + (t ? '\n' + t : '') + (ml ? '\n' + ml : '');
+  }
+
+  /** Oggetto maledetto specifico (riga 101 della tabella degli oggetti magici): categoria "Oggetto maledetto specifico", niente maledizione comune in più */
+  function generaMaledettoSpecifico(rng) {
+    const r = pescaTabella('Oggetti Maledetti Specifici', rng);
+    if (r === null) return '[tabella “Oggetti Maledetti Specifici” mancante]';
     const t = trattiDistintivi(rng);
-    return prefisso + ' - ' + EM + risolvi(r, rng) + EM + (t ? '\n' + t : '');
+    return 'Oggetto maledetto specifico - ' + EM + risolvi(r, rng) + EM + (t ? '\n' + t : '');
   }
 
   // Categorie di oggetti magici minori già implementate, con il loro generatore (chiave = riga della tabella "Oggetti Magici Minori").
-  // Le categorie non ancora presenti (e "Oggetto Maledetto Specifico") vengono ritirate: le proporzioni tra quelle presenti restano quelle della tabella.
+  // Le categorie non ancora presenti vengono ritirate: le proporzioni tra quelle presenti restano quelle della tabella.
   const GENERATORI_MINORI = {
     'arma': generaArmaMinore,
     'armatura o scudo': generaArmaturaScudoMinore,
     'anello': rng => oggettoDaTabella('Anello', 'Anelli Minori', rng),
-    'oggetto meraviglioso': rng => oggettoDaTabella('Oggetto Meraviglioso', 'Oggetti Meravigliosi Minori', rng)
+    'oggetto meraviglioso': rng => oggettoDaTabella('Oggetto Meraviglioso', 'Oggetti Meravigliosi Minori', rng),
+    'oggetto maledetto specifico': generaMaledettoSpecifico
   };
   function generaOggettiMinori(n, rng) {
     rng = rng || Math.random;
