@@ -494,19 +494,33 @@
     return prefisso + principale + '\n' + dettagliMagici(rng, { intelligente: 1, emanaLuce: false, runa: 30, nessuna: false });
   }
 
-  // Categorie di oggetti magici minori già implementate (le altre si ritirano); null = tutte
-  const CATEGORIE_MINORI_IMPLEMENTATE = ['armatura o scudo', 'arma'];
+  /** Oggetto magico "semplice": una riga di tabella, prefisso di categoria e tratti distintivi */
+  function oggettoDaTabella(prefisso, tabella, rng) {
+    const r = pescaTabella(tabella, rng);
+    if (r === null) return '[tabella “' + tabella + '” mancante]';
+    const t = trattiDistintivi(rng);
+    return prefisso + ' - ' + EM + risolvi(r, rng) + EM + (t ? '\n' + t : '');
+  }
+
+  // Categorie di oggetti magici minori già implementate, con il loro generatore (chiave = riga della tabella "Oggetti Magici Minori").
+  // Le categorie non ancora presenti (e "Oggetto Maledetto Specifico") vengono ritirate: le proporzioni tra quelle presenti restano quelle della tabella.
+  const GENERATORI_MINORI = {
+    'arma': generaArmaMinore,
+    'armatura o scudo': generaArmaturaScudoMinore,
+    'anello': rng => oggettoDaTabella('Anello', 'Anelli Minori', rng),
+    'oggetto meraviglioso': rng => oggettoDaTabella('Oggetto Meraviglioso', 'Oggetti Meravigliosi Minori', rng)
+  };
   function generaOggettiMinori(n, rng) {
     rng = rng || Math.random;
     const out = [];
     for (let k = 0; k < Math.min(n, MAX_MINORI); k++) {
-      let c = null;
-      for (let g = 0; g < 500; g++) {
+      let c = null, gen = null;
+      for (let g = 0; g < 1000 && !gen; g++) {
         c = pescaTabella('Oggetti Magici Minori', rng);
-        if (c === null || !CATEGORIE_MINORI_IMPLEMENTATE || CATEGORIE_MINORI_IMPLEMENTATE.indexOf(norm(c)) >= 0) break;
+        if (c === null) break;
+        gen = GENERATORI_MINORI[norm(c)] || null;
       }
-      if (c === null) { out.push('[tabella “Oggetti Magici Minori” mancante]'); continue; }
-      out.push(norm(c) === 'arma' ? generaArmaMinore(rng) : norm(c) === 'armatura o scudo' ? generaArmaturaScudoMinore(rng) : '(' + c + ')');
+      out.push(gen ? gen(rng) : '[tabella “Oggetti Magici Minori” mancante]');
     }
     return out;
   }
