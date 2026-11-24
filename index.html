@@ -52,7 +52,8 @@ h2{font-size:var(--ts);margin:18px 0 8px}
 .tz .it{padding:1px 0}.tz .sp{padding:0}
 .tz .mini{min-height:26px;min-width:30px;padding:2px 5px;margin-right:5px}.tz .mini svg{width:16px}
 .tz .alt{margin:1px 0 6px 6px;padding:3px 0 2px 8px}.tz .opt{padding:2px 0}
-.mini svg.bulb{transform:translateX(1.4px)}
+.mini svg.bulb,.mini svg.flask{transform:translateX(1px)}
+.sm{font-size:calc(1em - 2px)}
 .sub{margin-left:12px;font-size:.93em}
 .bx{padding:8px 10px}.hint{color:var(--mu);margin-bottom:6px}.nm2{font-weight:600}.bn{font-weight:700;color:var(--tx)}
 details.card>summary{list-style:none;cursor:pointer;padding:6px 10px;font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -150,7 +151,7 @@ function syncLists(t){let ch=false;
  if(mi.length>wm){t.minoriList=mi.slice(0,wm);ch=true}else if(mi.length<wm){t.minoriList=mi.concat(DH.generaOggettiMinori(wm-mi.length));ch=true}
  return ch}
 const BULB='<svg class="bulb" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>';
-const FLASK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.8 18.4L14 10.67V6.5l1.35-1.69c.26-.33.03-.81-.39-.81H9.04c-.42 0-.65.48-.39.81L10 6.5v4.17L4.2 18.4c-.49.66-.02 1.6.8 1.6h14c.82 0 1.29-.94.8-1.6z"/></svg>';
+const FLASK='<svg class="flask" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.8 18.4L14 10.67V6.5l1.35-1.69c.26-.33.03-.81-.39-.81H9.04c-.42 0-.65.48-.39.81L10 6.5v4.17L4.2 18.4c-.49.66-.02 1.6.8 1.6h14c.82 0 1.29-.94.8-1.6z"/></svg>';
 const ROM3=['I','II','III'];
 const numL=(n,tot)=>tot>1?`${n}: `:'';
 const limNote=(c,len)=>c>len?`<div class="mu">Elenco dettagliato limitato ai primi ${len} su ${c}.</div>`:'';
@@ -166,11 +167,11 @@ function arteHTML(t){const N=t.arteList,A=t.arteAlt,all=N.concat(A);if(!all.leng
   <div class="it"><b>Dimensioni:</b> ${esc(x.dim)}</div><div class="mu" style="font-size:.92em">R = Materiale Robusto / F = Materiale Fragile</div></div>`).join('')
  +(all.length>1?totRow(all):'')+limNote(t.arte,all.length)}
 // nome in semigrassetto; prefisso ("Arma - "), taglia e dadi tra parentesi in peso normale
-const EMC=DH.EM,BMC=DH.BM;
+const EMC=DH.EM,BMC=DH.BM,SMC=DH.SM;
 const nomeEx=h=>{const m=/^((?:Arma|Armatura|Scudo) - )?(.*?)( \((?:per creature di taglia|\d+d\d)[^)]*\))?$/.exec(h);return`${esc(m[1]||'')}<span class="nm2">${esc(m[2])}</span>${esc(m[3]||'')}`};
 // testo con tratti in semigrassetto corsivo (delimitati da un carattere di controllo)
-const richHTML=x=>{let b=0,i=0,o='';String(x).split(/([\u0001\u0002])/).forEach(p=>{if(p==='\u0001')i=!i;else if(p==='\u0002')b=!b;else if(p)o+=(b||i)?`<span class="nm2">${i?'<i>':''}${esc(p)}${i?'</i>':''}</span>`:esc(p)});return o};
-const hasMark=x=>x.indexOf(EMC)>=0||x.indexOf(BMC)>=0;
+const richHTML=x=>{let b=0,i=0,s=0,o='';String(x).split(/([\u0001\u0002\u0003])/).forEach(p=>{if(p==='\u0001')i=!i;else if(p==='\u0002')b=!b;else if(p==='\u0003')s=!s;else if(p){let h=esc(p);if(b||i)h=`<span class="nm2">${i?`<i>${h}</i>`:h}</span>`;if(s)h=`<span class="sm">${h}</span>`;o+=h}});return o};
+const hasMark=x=>x.indexOf(EMC)>=0||x.indexOf(BMC)>=0||x.indexOf(SMC)>=0;
 // righe di dettaglio "Etichetta: valore; Etichetta: valore": i valori in semigrassetto
 function detHTML(l){if(hasMark(l))return richHTML(l);
  const re=/(^|; )([^:;]+): ((?:[^;(]|\([^)]*\))+)/g;let o='',i=0,m;
@@ -203,9 +204,9 @@ function testoTesoro(t){const L=[],aT=fl2(t.val/t.part);
    if(x.alt){L.push(`   Tipo: ${x.tipo}; Specifico: ${x.spec}`);x.opz.forEach((p,k)=>L.push(`   Opzione ${ROM3[k]}: materiale robusto: ${p.rob}; materiale fragile: ${p.fra}; scena dipinta: ${p.scena}; abbellimento: ${p.abb}`));L.push(`   Dimensioni: ${x.dim}`,'   (R = Materiale Robusto / F = Materiale Fragile)')}});
   tot(all);lim(t.arte,all.length)}
  L.push('','Oggetti comuni:');const C=t.comuniList;
- if(!C.length)L.push('Nessun oggetto comune.');else{C.forEach((x,i)=>{const r=String(x).replace(/[\u0001\u0002]/g,'').split('\n');L.push(`${numL(i+1,C.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.comuni,C.length)}
+ if(!C.length)L.push('Nessun oggetto comune.');else{C.forEach((x,i)=>{const r=String(x).replace(/[\u0001\u0002\u0003]/g,'').split('\n');L.push(`${numL(i+1,C.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.comuni,C.length)}
  L.push('','Oggetti magici:');const Mi=t.minoriList,mg=MAGICI.filter(([k])=>t.oggetti[k]>0);
- if(t.oggetti.minori>0){L.push('Minori:');Mi.forEach((x,i)=>{const r=String(x).replace(/[\u0001\u0002]/g,'').split('\n');L.push(`${numL(i+1,Mi.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.minori,Mi.length)}
+ if(t.oggetti.minori>0){L.push('Minori:');Mi.forEach((x,i)=>{const r=String(x).replace(/[\u0001\u0002\u0003]/g,'').split('\n');L.push(`${numL(i+1,Mi.length)}${r.shift()}`);r.forEach(l=>L.push('   '+l))});lim(t.oggetti.minori,Mi.length)}
  mg.forEach(([k,l])=>L.push(`${l}: ${t.oggetti[k]}`));
  if(t.oggetti.minori<=0&&!mg.length)L.push('Nessun oggetto magico.');
  if(t.notes.trim())L.push('','Note:',t.notes.trim());
