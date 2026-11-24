@@ -379,6 +379,7 @@
   }
 
   const BM = '\u0002'; // delimita i tratti da mostrare in semigrassetto (senza corsivo)
+  const SM = '\u0003'; // delimita i tratti da mostrare con carattere più piccolo
   /** Tratti distintivi di un oggetto magico: 1 tratto fino a 95, 2 da 96 a 99, 3 con 100 (niente doppioni) */
   function trattiDistintivi(rng) {
     const NOME = 'Tratti Distintivi Oggetti Magici';
@@ -545,13 +546,13 @@
 
   // ---- Pozioni (e in seguito pergamene e bacchette): classe e livello dell'incantesimo ----
   const CLASSI_INCANTATORI = [[30, 'Mago'], [50, 'Chierico'], [65, 'Druido'], [80, 'Stregone'], [88, 'Bardo'], [94, 'Paladino'], [100, 'Ranger'],
-    [108, 'Convocatore'], [133, 'Fattucchiere'], [141, 'Inquisitore'], [156, 'Oracolo']]; // 1d156, come nella macro
+    [125, 'Alchimista'], [133, 'Convocatore'], [158, 'Fattucchiere'], [166, 'Inquisitore'], [181, 'Oracolo']]; // 1d181, come nella macro
   const LIVELLI_POZIONE = { minore: [[20, 0], [60, 1], [100, 2]], media: [[20, 1], [60, 2], [100, 3]], maggiore: [[20, 2], [100, 3]] }; // 1d100
 
-  const CLASSI_SENZA_LIVELLO_0 = ['Paladino', 'Ranger', 'Convocatore', 'Bardo', 'Alchimista', 'Inquisitore'];
+  const CLASSI_SENZA_LIVELLO_0 = ['Paladino', 'Ranger', 'Alchimista']; // valido anche per pergamene e bacchette di livello 0
   function classeCasuale(rng, livello) {
     for (let g = 0; g < 1000; g++) {
-      const t = Math.floor(rng() * 156) + 1, c = CLASSI_INCANTATORI.find(x => t <= x[0])[1];
+      const t = Math.floor(rng() * 181) + 1, c = CLASSI_INCANTATORI.find(x => t <= x[0])[1];
       if (livello === 0 && CLASSI_SENZA_LIVELLO_0.indexOf(c) >= 0) continue; // queste classi non estraggono incantesimi di livello 0
       return c;
     }
@@ -569,7 +570,7 @@
     if (!el) return { testo: '', nome: '' };
     let s = el[Math.floor(rng() * el.length)];
     for (let g = 0; g < 10 && el.length > 1 && s[0] === escludi; g++) s = el[Math.floor(rng() * el.length)];
-    return { testo: ': ' + EM + s[0] + EM + ' (' + EM + s[1] + EM + ', ' + s[2] + ')', nome: s[0] };
+    return { testo: ': ' + EM + s[0] + EM + SM + ' (' + EM + s[1] + EM + ', ' + s[2] + ')' + SM, nome: s[0] };
   }
 
   /** Pozione minore, media o maggiore (una alla volta) */
@@ -579,27 +580,33 @@
     const classe = classeCasuale(rng, livello);
     const sp = testoIncantesimo(classe, livello, rng).testo;
     const ml = rigaMaledizione(rng); // le pozioni non hanno tratti distintivi
-    return 'Pozione - ' + BM + classe + ', Incantesimo di Lv ' + livello + sp + BM + (ml ? '\n' + ml : '');
+    return 'Pozione - ' + BM + classe + BM + ', Incantesimo di ' + BM + 'Lv ' + livello + BM + sp + (ml ? '\n' + ml : '');
   }
-  const RE_INC = /^(.*?)\u0002([^,\u0001\u0002]+), Incantesimo di Lv (\d+)(.*)\u0002$/;
+  /** Legge la prima riga di una pozione: { prima, classe, livello, incantesimo } (formato attuale e quello precedente) */
+  function leggiIncantesimo(riga) {
+    let m = /^(.*?)\u0002([^,\u0001\u0002\u0003]+)\u0002, Incantesimo di \u0002Lv (\d+)\u0002(.*)$/.exec(riga);
+    if (m) return { prima: m[1], classe: m[2], livello: Number(m[3]), incantesimo: m[4] };
+    m = /^(.*?)\u0002([^,\u0001\u0002\u0003]+), Incantesimo di Lv (\d+)(.*)\u0002$/.exec(riga);   // formato precedente
+    return m ? { prima: m[1], classe: m[2], livello: Number(m[3]), incantesimo: m[4] } : null;
+  }
   /** true se la prima riga descrive un incantesimo e per quella classe e livello esiste un elenco da cui rigenerarlo */
   function incantesimoRigenerabile(testo) {
-    const m = RE_INC.exec(String(testo).split('\n')[0]);
-    return !!m && haIncantesimi(m[2], Number(m[3]));
+    const m = leggiIncantesimo(String(testo).split('\n')[0]);
+    return !!m && haIncantesimi(m.classe, m.livello);
   }
   /** Rigenera solo l'incantesimo (stessa classe e stesso livello), lasciando invariato il resto dell'oggetto */
   function rigeneraIncantesimo(testo, rng) {
     rng = rng || Math.random;
-    const righe = String(testo).split('\n'), m = RE_INC.exec(righe[0]);
+    const righe = String(testo).split('\n'), m = leggiIncantesimo(righe[0]);
     if (!m) return testo;
-    const precedente = (/\u0001([^\u0001]*)\u0001/.exec(m[4]) || [])[1];
-    const sp = testoIncantesimo(m[2], Number(m[3]), rng, precedente);
+    const precedente = (/\u0001([^\u0001]*)\u0001/.exec(m.incantesimo) || [])[1];
+    const sp = testoIncantesimo(m.classe, m.livello, rng, precedente);
     if (!sp.testo) return testo;
-    righe[0] = m[1] + BM + m[2] + ', Incantesimo di Lv ' + m[3] + sp.testo + BM;
+    righe[0] = m.prima + BM + m.classe + BM + ', Incantesimo di ' + BM + 'Lv ' + m.livello + BM + sp.testo;
     return righe.join('\n');
   }
 
-  const API = { generaTesoro, generaPozione, rigeneraIncantesimo, incantesimoRigenerabile, haIncantesimi, MAX_MOLTIPLICATORE, generaOggettiMinori, generaArmaMinore, generaArmaturaScudoMinore, trattiDistintivi, tiraAbilita, MAX_MINORI, EM, BM, generaOggettiComuni, generaArma, generaArmatura, generaScudo, espandiDadi, MAX_COMUNI, generaPersonalizzato, generaGemme, generaOggettiArte, riepilogo, risolvi, MAX_GEMME, MAX_ARTE, interpretaGS, scalaGS, esperienzaPerGS, valoreTesoroPerGS };
+  const API = { generaTesoro, generaPozione, SM, rigeneraIncantesimo, incantesimoRigenerabile, haIncantesimi, MAX_MOLTIPLICATORE, generaOggettiMinori, generaArmaMinore, generaArmaturaScudoMinore, trattiDistintivi, tiraAbilita, MAX_MINORI, EM, BM, generaOggettiComuni, generaArma, generaArmatura, generaScudo, espandiDadi, MAX_COMUNI, generaPersonalizzato, generaGemme, generaOggettiArte, riepilogo, risolvi, MAX_GEMME, MAX_ARTE, interpretaGS, scalaGS, esperienzaPerGS, valoreTesoroPerGS };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else root.HicSuntDracones = Object.assign(root.HicSuntDracones || {}, API);
 })(typeof window !== 'undefined' ? window : globalThis);
