@@ -183,7 +183,7 @@ function comuniHTML(t){const L=t.comuniList;if(!L.length)return'<span class="mu"
  return L.map((x,i)=>`<div class="it">${numL(i+1,L.length)}${itemHTML(x)}</div>`).join('')+limNote(t.oggetti.comuni,L.length)}
 const MAGICI=[['medi','Medi'],['maggiori','Maggiori']];
 function magiciHTML(t){const L=t.minoriList,o=t.oggetti;let h='';
- if(o.minori>0)h+='<div class="it"><b>Minori:</b></div>'+L.map((x,i)=>`<div class="it">${DH.incantesimoRigenerabile(x)?`<button class="mini" data-a="spell" data-i="${i}" aria-label="Rigenera l’incantesimo">${FLASK}</button>`:''}${numL(i+1,L.length)}${itemHTML(x)}</div>`).join('')+limNote(o.minori,L.length);
+ if(o.minori>0)h+='<div class="it"><b>Minori:</b></div>'+L.map((x,i)=>`<div class="it">${numL(i+1,L.length)}${DH.incantesimoRigenerabile(x)?`<button class="mini" data-a="spell" data-i="${i}" aria-label="Rigenera l’incantesimo">${FLASK}</button>`:''}${itemHTML(x)}</div>`).join('')+limNote(o.minori,L.length);
  h+=MAGICI.filter(([k])=>o[k]>0).map(([k,l])=>`<div class="it">${l}: <b>${o[k]}</b></div>`).join('');
  return h||'<span class="mu">Nessun oggetto magico.</span>'}
 function paintLists(){const t=S.treasures[V.id];if(!t)return;setH('#dG',gemmeHTML(t));setH('#dA',arteHTML(t));setH('#dC',comuniHTML(t));setH('#dMg',magiciHTML(t))}
