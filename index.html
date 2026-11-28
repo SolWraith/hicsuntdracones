@@ -183,6 +183,9 @@ function comuniHTML(t){const L=t.comuniList;if(!L.length)return'<span class="mu"
  return L.map((x,i)=>`<div class="it">${numL(i+1,L.length)}${itemHTML(x)}</div>`).join('')+limNote(t.oggetti.comuni,L.length)}
 const MAGICI=[['medi','Medi'],['maggiori','Maggiori']];
 function magiciHTML(t){const L=t.minoriList,o=t.oggetti;let h='';
+ // avviso iniziale: compare se c'è almeno una pozione di cui si può cambiare l'incantesimo (cioè con il suo bottone), di qualsiasi grado:
+ // si controllano tutti gli elenchi di oggetti magici (minori ora; medi e maggiori quando ci saranno), senza dipendere dal numero di minori
+ if([t.minoriList,t.mediList,t.maggioriList].filter(Array.isArray).some(l=>l.some(x=>DH.incantesimoRigenerabile(x))))h+='<div class="mu" style="font-size:.92em">Tocca l’icona di una pozione per cambiare l’incantesimo corrispondente.</div>';
  if(o.minori>0)h+='<div class="it"><b>Minori:</b></div>'+L.map((x,i)=>`<div class="it">${numL(i+1,L.length)}${DH.incantesimoRigenerabile(x)?`<button class="mini" data-a="spell" data-i="${i}" aria-label="Rigenera l’incantesimo">${FLASK}</button>`:''}${itemHTML(x)}</div>`).join('')+limNote(o.minori,L.length);
  h+=MAGICI.filter(([k])=>o[k]>0).map(([k,l])=>`<div class="it">${l}: <b>${o[k]}</b></div>`).join('');
  return h||'<span class="mu">Nessun oggetto magico.</span>'}
